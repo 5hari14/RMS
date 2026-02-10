@@ -6,3 +6,424 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  OWNER
+  MANAGER
+  HOST
+  STAFF
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  SEATED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum ReservationSource {
+  PHONE
+  WEBSITE
+  BITES_APP
+  WALK_IN
+  GOOGLE
+  FACEBOOK
+  INSTAGRAM
+}
+
+enum TableShape {
+  ROUND
+  SQUARE
+  RECTANGULAR
+  BAR
+}
+
+enum TableSection {
+  INDOOR
+  OUTDOOR
+  TERRACE
+  PRIVATE
+  BAR
+}
+
+enum DepositStatus {
+  PENDING
+  CAPTURED
+  REFUNDED
+}
+
+enum WaitlistStatus {
+  WAITING
+  NOTIFIED
+  SEATED
+  LEFT
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Restaurant (tenant)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Restaurant {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name     String
+  slug     String  @unique
+  timezone String  @default("UTC")
+  currency String  @default("USD")
+  phone    String?
+  email    String?
+  website  String?
+  address  String?
+  city     String?
+  state    String?
+  postcode String?
+  country  String?
+  logoUrl  String?
+
+  users           User[]
+  customers       Customer[]
+  floorPlans      FloorPlan[]
+  reservations    Reservation[]
+  waitlistEntries WaitlistEntry[]
+  auditLogs       AuditLog[]
+  operatingHours  OperatingHours[]
+  specialDates    SpecialDate[]
+  bookingWidget   BookingWidget?
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// User (staff member)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  email    String   @unique
+  name     String
+  role     UserRole
+  isActive Boolean  @default(true)
+  pin      String?
+
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  createdReservations Reservation[] @relation("ReservationCreatedBy")
+  auditLogs           AuditLog[]
+
+  @@index([restaurantId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Customer (guest / diner)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Customer {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  firstName String
+  lastName  String?
+  email     String?
+  phone     String?
+
+  // Preferences
+  favouriteTableId    String?
+  dietaryRequirements String?
+  allergies           String[]
+
+  // Flags
+  isVip           Boolean @default(false)
+  isBlacklisted   Boolean @default(false)
+  blacklistReason String?
+
+  // Link to Bites consumer app
+  bitesProfileId String?
+
+  notes String?
+
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  reservations    Reservation[]
+  waitlistEntries WaitlistEntry[]
+
+  @@unique([email, restaurantId])
+  @@unique([phone, restaurantId])
+  @@index([restaurantId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Floor Plan & Tables
+// ─────────────────────────────────────────────────────────────────────────────
+
+model FloorPlan {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name     String
+  isActive Boolean @default(true)
+
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  tables Table[]
+
+  @@index([restaurantId])
+}
+
+model Table {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  number    Int
+  name      String?
+  minCovers Int          @default(1)
+  maxCovers Int
+  shape     TableShape   @default(RECTANGULAR)
+  section   TableSection @default(INDOOR)
+
+  // Position on floor plan (for rendering)
+  x      Float @default(0)
+  y      Float @default(0)
+  width  Float @default(80)
+  height Float @default(80)
+
+  // Flags
+  isActive     Boolean @default(true)
+  isAccessible Boolean @default(false)
+  hasHighChair Boolean @default(false)
+
+  floorPlanId String
+  floorPlan   FloorPlan @relation(fields: [floorPlanId], references: [id], onDelete: Cascade)
+
+  reservations Reservation[]
+
+  @@unique([floorPlanId, number])
+  @@index([floorPlanId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reservation
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Reservation {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  date      DateTime
+  time      DateTime
+  partySize Int
+  duration  Int               @default(90) // estimated minutes
+  status    ReservationStatus @default(PENDING)
+  source    ReservationSource @default(PHONE)
+
+  specialRequests String?
+  internalNotes   String?
+
+  // Timestamps for status transitions
+  confirmedAt DateTime?
+  seatedAt    DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  tableId String?
+  table   Table?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
+
+  createdById String
+  createdBy   User   @relation("ReservationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  tags     ReservationTag[]
+  deposits Deposit[]
+
+  @@index([restaurantId, date])
+  @@index([restaurantId, status])
+  @@index([customerId])
+  @@index([tableId])
+}
+
+model ReservationTag {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  label String // VIP, BIRTHDAY, BUSINESS, FIRST_TIME, etc.
+
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@unique([reservationId, label])
+  @@index([reservationId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Deposit (payment)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Deposit {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  amount   Int           // in smallest currency unit (cents)
+  currency String        @default("USD")
+  status   DepositStatus @default(PENDING)
+
+  stripePaymentIntentId String? @unique
+
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@index([reservationId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Waitlist
+// ─────────────────────────────────────────────────────────────────────────────
+
+model WaitlistEntry {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  partySize            Int
+  estimatedWaitMinutes Int?
+  status               WaitlistStatus @default(WAITING)
+  notes                String?
+
+  // Contact for walk-ins without a customer record
+  name  String?
+  phone String?
+
+  notifiedAt DateTime?
+  seatedAt   DateTime?
+
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId, status])
+  @@index([customerId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Audit Log
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  action     String
+  entityType String
+  entityId   String
+  details    Json?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
+  @@index([entityType, entityId])
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Operating Hours
+// ─────────────────────────────────────────────────────────────────────────────
+
+model OperatingHours {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dayOfWeek DayOfWeek
+  openTime  String    // "09:00" format (HH:mm)
+  closeTime String    // "23:00" format (HH:mm)
+  isClosed  Boolean   @default(false)
+
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, dayOfWeek])
+  @@index([restaurantId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Special Date (closures, holidays, events)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model SpecialDate {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  date        DateTime
+  name        String
+  isClosed    Boolean @default(false)
+  openTime    String? // override operating hours
+  closeTime   String?
+  description String?
+
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, date])
+  @@index([restaurantId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Booking Widget (per-restaurant configuration)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model BookingWidget {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  isEnabled              Boolean @default(true)
+  maxPartySize           Int     @default(10)
+  minAdvanceMinutes      Int     @default(60)
+  maxAdvanceDays         Int     @default(30)
+  slotIntervalMinutes    Int     @default(15)
+  defaultDurationMinutes Int     @default(90)
+  requireDeposit         Boolean @default(false)
+  depositAmountCents     Int     @default(0)
+  confirmationMessage    String?
+  primaryColor           String  @default("#1e293b")
+
+  restaurantId String     @unique
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+}
