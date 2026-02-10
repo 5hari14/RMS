@@ -1,2 +1,13 @@
 export { appRouter, type AppRouter } from "./root";
-export { createRouter, publicProcedure, type Context } from "./trpc";
+export {
+  createRouter,
+  createCallerFactory,
+  publicProcedure,
+  protectedProcedure,
+  hostProcedure,
+  managerProcedure,
+  ownerProcedure,
+  type Context,
+  type Session,
+  type CreateContextOptions,
+} from "./trpc";
