@@ -15,5 +15,5 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export { PrismaClient };
-export { UserRole } from "@prisma/client";
+export { UserRole, ReservationStatus, ReservationSource } from "@prisma/client";
 export type * from "@prisma/client";
