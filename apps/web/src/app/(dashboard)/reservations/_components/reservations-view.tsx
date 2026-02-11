@@ -10,15 +10,14 @@ import { DateNav } from "./date-nav";
 import { SummaryBar } from "./summary-bar";
 import { FilterBar } from "./filter-bar";
 import { ReservationTable } from "./reservation-table";
-import { ReservationDetailPanel } from "./reservation-detail-panel";
-import { CreateReservationPanel } from "./create-reservation-panel";
-import type { Reservation } from "./types";
+import { ReservationPanel } from "./reservation-panel";
+import type { Reservation, PanelMode } from "./types";
 
 export function ReservationsView() {
   const [selectedDate, setSelectedDate] = React.useState(() => startOfDay(new Date()));
   const [selectedReservation, setSelectedReservation] = React.useState<Reservation | null>(null);
-  const [detailOpen, setDetailOpen] = React.useState(false);
-  const [createOpen, setCreateOpen] = React.useState(false);
+  const [panelOpen, setPanelOpen] = React.useState(false);
+  const [panelMode, setPanelMode] = React.useState<PanelMode>("view");
 
   // Filters
   const [statusFilter, setStatusFilter] = React.useState("all");
@@ -78,16 +77,26 @@ export function ReservationsView() {
 
   function handleRowClick(reservation: Reservation) {
     setSelectedReservation(reservation);
-    setDetailOpen(true);
+    setPanelMode("view");
+    setPanelOpen(true);
   }
 
-  function handleStatusUpdate() {
-    refetch();
-    setDetailOpen(false);
+  function handleNewReservation() {
     setSelectedReservation(null);
+    setPanelMode("create");
+    setPanelOpen(true);
   }
 
-  function handleCreated() {
+  function handlePanelClose() {
+    setPanelOpen(false);
+    // Small delay to let Sheet animation finish before clearing state
+    setTimeout(() => {
+      setSelectedReservation(null);
+      setPanelMode("view");
+    }, 300);
+  }
+
+  function handleMutationSuccess() {
     refetch();
   }
 
@@ -96,7 +105,7 @@ export function ReservationsView() {
       {/* Header row: date nav + new reservation button */}
       <div className="flex items-center justify-between">
         <DateNav date={selectedDate} onDateChange={setSelectedDate} />
-        <Button onClick={() => setCreateOpen(true)} className="gap-2">
+        <Button onClick={handleNewReservation} className="gap-2">
           <Plus className="h-4 w-4" />
           New Reservation
         </Button>
@@ -118,22 +127,14 @@ export function ReservationsView() {
       {/* Reservation table */}
       <ReservationTable reservations={filteredReservations} onRowClick={handleRowClick} />
 
-      {/* Detail slide-over */}
-      <ReservationDetailPanel
+      {/* Unified panel — handles view, edit, and create modes */}
+      <ReservationPanel
+        mode={panelMode}
         reservation={selectedReservation}
-        open={detailOpen}
-        onClose={() => {
-          setDetailOpen(false);
-          setSelectedReservation(null);
-        }}
-        onStatusUpdate={handleStatusUpdate}
-      />
-
-      {/* Create slide-over */}
-      <CreateReservationPanel
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onCreated={handleCreated}
+        open={panelOpen}
+        onClose={handlePanelClose}
+        onModeChange={setPanelMode}
+        onMutationSuccess={handleMutationSuccess}
         defaultDate={selectedDate}
       />
     </div>

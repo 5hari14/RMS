@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import type { ReservationStatus } from "@bites-rms/db";
 import { createRouter, protectedProcedure, hostProcedure } from "../trpc";
+import { z } from "zod";
 import {
   getByIdSchema,
   getByDateSchema,
@@ -155,6 +156,26 @@ export const reservationRouter = createRouter({
       take: 50,
     });
   }),
+
+  getAuditLog: protectedProcedure
+    .input(z.object({ reservationId: z.string().cuid() }))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.auditLog.findMany({
+        where: {
+          restaurantId: ctx.restaurantId,
+          entityType: "Reservation",
+          entityId: input.reservationId,
+        },
+        select: {
+          id: true,
+          createdAt: true,
+          action: true,
+          details: true,
+          user: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+    }),
 
   // ─── Mutations ────────────────────────────────────────────────────────
 

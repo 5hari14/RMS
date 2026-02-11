@@ -47,3 +47,4 @@ export {
 export { Separator } from "./separator";
 export { ScrollArea, ScrollBar } from "./scroll-area";
 export { Calendar, type CalendarProps } from "./calendar";
+export { Checkbox } from "./checkbox";
