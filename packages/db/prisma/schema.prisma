@@ -135,6 +135,7 @@ model User {
 
   createdReservations Reservation[] @relation("ReservationCreatedBy")
   auditLogs           AuditLog[]
+  customerNotes       CustomerNote[]
 
   @@index([restaurantId])
 }
@@ -173,10 +174,27 @@ model Customer {
 
   reservations    Reservation[]
   waitlistEntries WaitlistEntry[]
+  customerNotes   CustomerNote[]
 
   @@unique([email, restaurantId])
   @@unique([phone, restaurantId])
   @@index([restaurantId])
+}
+
+model CustomerNote {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  text String
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([customerId])
+  @@index([authorId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

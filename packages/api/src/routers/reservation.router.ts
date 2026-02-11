@@ -35,6 +35,8 @@ const reservationInclude = {
       phone: true,
       isVip: true,
       isBlacklisted: true,
+      allergies: true,
+      dietaryRequirements: true,
     },
   },
   table: {

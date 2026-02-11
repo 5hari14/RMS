@@ -16,6 +16,8 @@ export interface Reservation {
     phone: string | null;
     isVip: boolean;
     isBlacklisted: boolean;
+    allergies: string[];
+    dietaryRequirements: string | null;
   } | null;
   table: {
     id: string;

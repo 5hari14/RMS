@@ -286,6 +286,35 @@ function ViewMode({
             </>
           )}
 
+          {/* Allergy / Dietary Alert */}
+          {reservation.customer &&
+            (reservation.customer.allergies.length > 0 ||
+              reservation.customer.dietaryRequirements) && (
+              <>
+                <div className="flex items-start gap-3 rounded-lg border-2 border-red-300 bg-red-50 p-3">
+                  <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-semibold text-red-800">
+                      Allergy &amp; Dietary Alert
+                    </p>
+                    {reservation.customer.allergies.length > 0 && (
+                      <p className="text-xs text-red-700">
+                        <span className="font-medium">Allergies:</span>{" "}
+                        {reservation.customer.allergies.join(", ")}
+                      </p>
+                    )}
+                    {reservation.customer.dietaryRequirements && (
+                      <p className="text-xs text-red-700">
+                        <span className="font-medium">Dietary:</span>{" "}
+                        {reservation.customer.dietaryRequirements}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <Separator />
+              </>
+            )}
+
           {/* Tags */}
           {reservation.tags.length > 0 && (
             <>
