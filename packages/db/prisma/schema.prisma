@@ -98,6 +98,11 @@ model Restaurant {
   country  String?
   logoUrl  String?
 
+  // Notification preferences
+  enableEmailConfirmations Boolean @default(true)
+  enableSmsConfirmations   Boolean @default(true)
+  enableReminders          Boolean @default(true)
+
   users           User[]
   customers       Customer[]
   floorPlans      FloorPlan[]

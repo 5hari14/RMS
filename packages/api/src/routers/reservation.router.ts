@@ -15,6 +15,11 @@ import {
   cancelSchema,
   assignTableSchema,
 } from "../schemas/reservation.schema";
+import { sendConfirmation, sendCancellation } from "../services/notification.service";
+import {
+  buildNotificationData,
+  getNotificationPreferences,
+} from "../services/notification-helpers";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared includes for returning reservation with relations
@@ -289,6 +294,18 @@ export const reservationRouter = createRouter({
       return created;
     });
 
+    // Send confirmation notification (fire-and-forget)
+    getNotificationPreferences(ctx.prisma, ctx.restaurantId)
+      .then((prefs) =>
+        sendConfirmation(
+          buildNotificationData(reservation, ctx.session.user.restaurantName),
+          prefs,
+        ),
+      )
+      .catch((err) =>
+        console.error("[notification] Failed to send confirmation:", err),
+      );
+
     return reservation;
   }),
 
@@ -421,6 +438,20 @@ export const reservationRouter = createRouter({
         return updated;
       });
 
+      // Send confirmation notification when status moves to CONFIRMED
+      if (input.status === "CONFIRMED") {
+        getNotificationPreferences(ctx.prisma, ctx.restaurantId)
+          .then((prefs) =>
+            sendConfirmation(
+              buildNotificationData(reservation, ctx.session.user.restaurantName),
+              prefs,
+            ),
+          )
+          .catch((err) =>
+            console.error("[notification] Failed to send confirmation:", err),
+          );
+      }
+
       return reservation;
     }),
 
@@ -469,6 +500,18 @@ export const reservationRouter = createRouter({
 
       return updated;
     });
+
+    // Send cancellation notification (fire-and-forget)
+    getNotificationPreferences(ctx.prisma, ctx.restaurantId)
+      .then((prefs) =>
+        sendCancellation(
+          buildNotificationData(reservation, ctx.session.user.restaurantName),
+          prefs,
+        ),
+      )
+      .catch((err) =>
+        console.error("[notification] Failed to send cancellation:", err),
+      );
 
     return reservation;
   }),

@@ -11,3 +11,4 @@ export {
   type Session,
   type CreateContextOptions,
 } from "./trpc";
+export { sendDailyReminders } from "./jobs/send-reminders";
