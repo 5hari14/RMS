@@ -3,6 +3,7 @@ import { requireAuth } from "@/lib/require-auth";
 import {
   CalendarDays,
   LayoutDashboard,
+  Map,
   Users,
   UtensilsCrossed,
   Settings,
@@ -11,6 +12,7 @@ import {
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/reservations", label: "Reservations", icon: CalendarDays },
+  { href: "/floor-plan", label: "Floor Plan", icon: Map },
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/tables", label: "Tables", icon: UtensilsCrossed },
   { href: "/settings", label: "Settings", icon: Settings },
