@@ -80,4 +80,85 @@ export const settingsRouter = createRouter({
 
       return restaurant;
     }),
+
+  // ─── Booking Widget ─────────────────────────────────────────────────────
+
+  getBookingWidget: protectedProcedure.query(async ({ ctx }) => {
+    const widget = await ctx.prisma.bookingWidget.findUnique({
+      where: { restaurantId: ctx.restaurantId },
+    });
+
+    return widget;
+  }),
+
+  upsertBookingWidget: managerProcedure
+    .input(
+      z.object({
+        isEnabled: z.boolean().optional(),
+        maxPartySize: z.number().int().min(1).max(50).optional(),
+        minAdvanceMinutes: z.number().int().min(0).max(10080).optional(),
+        maxAdvanceDays: z.number().int().min(1).max(365).optional(),
+        slotIntervalMinutes: z.number().int().min(5).max(60).optional(),
+        defaultDurationMinutes: z.number().int().min(15).max(480).optional(),
+        confirmationMessage: z.string().max(500).nullable().optional(),
+        primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const widget = await ctx.prisma.$transaction(async (tx) => {
+        const existing = await tx.bookingWidget.findUnique({
+          where: { restaurantId: ctx.restaurantId },
+        });
+
+        const upserted = await tx.bookingWidget.upsert({
+          where: { restaurantId: ctx.restaurantId },
+          create: {
+            restaurantId: ctx.restaurantId,
+            isEnabled: input.isEnabled ?? true,
+            maxPartySize: input.maxPartySize ?? 10,
+            minAdvanceMinutes: input.minAdvanceMinutes ?? 60,
+            maxAdvanceDays: input.maxAdvanceDays ?? 30,
+            slotIntervalMinutes: input.slotIntervalMinutes ?? 15,
+            defaultDurationMinutes: input.defaultDurationMinutes ?? 90,
+            confirmationMessage: input.confirmationMessage ?? null,
+            primaryColor: input.primaryColor ?? "#1e293b",
+          },
+          update: {
+            ...(input.isEnabled !== undefined && { isEnabled: input.isEnabled }),
+            ...(input.maxPartySize !== undefined && { maxPartySize: input.maxPartySize }),
+            ...(input.minAdvanceMinutes !== undefined && {
+              minAdvanceMinutes: input.minAdvanceMinutes,
+            }),
+            ...(input.maxAdvanceDays !== undefined && { maxAdvanceDays: input.maxAdvanceDays }),
+            ...(input.slotIntervalMinutes !== undefined && {
+              slotIntervalMinutes: input.slotIntervalMinutes,
+            }),
+            ...(input.defaultDurationMinutes !== undefined && {
+              defaultDurationMinutes: input.defaultDurationMinutes,
+            }),
+            ...(input.confirmationMessage !== undefined && {
+              confirmationMessage: input.confirmationMessage,
+            }),
+            ...(input.primaryColor !== undefined && { primaryColor: input.primaryColor }),
+          },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            action: existing
+              ? "settings.updateBookingWidget"
+              : "settings.createBookingWidget",
+            entityType: "BookingWidget",
+            entityId: upserted.id,
+            userId: ctx.user.id,
+            restaurantId: ctx.restaurantId,
+            details: input,
+          },
+        });
+
+        return upserted;
+      });
+
+      return widget;
+    }),
 });
