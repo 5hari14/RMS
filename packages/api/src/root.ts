@@ -8,6 +8,7 @@ import { waitlistRouter } from "./routers/waitlist.router";
 import { analyticsRouter } from "./routers/analytics.router";
 import { settingsRouter } from "./routers/settings.router";
 import { userRouter } from "./routers/user.router";
+import { liveTableRouter } from "./routers/live-table.router";
 
 export const appRouter = createRouter({
   reservation: reservationRouter,
@@ -19,6 +20,7 @@ export const appRouter = createRouter({
   analytics: analyticsRouter,
   settings: settingsRouter,
   user: userRouter,
+  liveTable: liveTableRouter,
 });
 
 export type AppRouter = typeof appRouter;

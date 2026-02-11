@@ -8,3 +8,5 @@ export interface TenantEntity {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export * from "./socket";

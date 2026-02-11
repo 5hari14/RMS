@@ -12,3 +12,4 @@ export {
   type CreateContextOptions,
 } from "./trpc";
 export { sendDailyReminders } from "./jobs/send-reminders";
+export { createSocketServer, getSocketServer, emitToRestaurant } from "./socket";
