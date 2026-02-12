@@ -98,10 +98,26 @@ model Restaurant {
   country  String?
   logoUrl  String?
 
+  // Restaurant profile
+  cuisineType String?
+  priceRange  String? // "$", "$$", "$$$", "$$$$"
+
   // Notification preferences
   enableEmailConfirmations Boolean @default(true)
   enableSmsConfirmations   Boolean @default(true)
   enableReminders          Boolean @default(true)
+  reminderTiming           String  @default("24h") // "24h", "2h", "both"
+  customConfirmationMsg    String?
+
+  // Reservation settings
+  defaultDurationMinutes     Int     @default(90)
+  slotIntervalMinutes        Int     @default(15)
+  maxAdvanceDays             Int     @default(30)
+  minPartySize               Int     @default(1)
+  maxPartySize               Int     @default(10)
+  onlineBookingCapacity      Int     @default(100) // percentage 0-100
+  autoConfirmOnlineBookings  Boolean @default(true)
+  noShowGracePeriodMinutes   Int     @default(15)
 
   // Stripe / Payment settings
   stripeAccountId       String?
@@ -405,6 +421,7 @@ model OperatingHours {
   updatedAt DateTime @updatedAt
 
   dayOfWeek DayOfWeek
+  label     String    @default("default") // "lunch", "dinner", "default"
   openTime  String    // "09:00" format (HH:mm)
   closeTime String    // "23:00" format (HH:mm)
   isClosed  Boolean   @default(false)
@@ -412,7 +429,7 @@ model OperatingHours {
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
-  @@unique([restaurantId, dayOfWeek])
+  @@unique([restaurantId, dayOfWeek, label])
   @@index([restaurantId])
 }
 

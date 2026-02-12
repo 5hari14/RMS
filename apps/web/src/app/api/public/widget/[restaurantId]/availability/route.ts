@@ -113,12 +113,10 @@ export async function GET(request: NextRequest, { params }: Params) {
     ] as const;
     const dayOfWeek = dayNames[date.getDay()]!;
 
-    const operatingHours = await prisma.operatingHours.findUnique({
+    const operatingHours = await prisma.operatingHours.findFirst({
       where: {
-        restaurantId_dayOfWeek: {
-          restaurantId,
-          dayOfWeek,
-        },
+        restaurantId,
+        dayOfWeek,
       },
     });
 
