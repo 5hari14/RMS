@@ -13,3 +13,4 @@ export {
 } from "./trpc";
 export { sendDailyReminders } from "./jobs/send-reminders";
 export { createSocketServer, getSocketServer, emitToRestaurant } from "./socket";
+export { constructWebhookEvent } from "./services/stripe.service";

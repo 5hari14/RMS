@@ -16,6 +16,9 @@ import {
   Star,
   Ban,
   AlertTriangle,
+  CreditCard,
+  DollarSign,
+  Loader2,
 } from "lucide-react";
 import {
   Sheet,
@@ -55,6 +58,7 @@ import {
 } from "./reservation-form-schema";
 import type { Reservation, PanelMode, CustomerSearchResult } from "./types";
 import { TAG_OPTIONS as TAGS, SOURCE_OPTIONS as SOURCES } from "./types";
+import { DepositDialog, SetupCardDialog } from "./deposit-dialog";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Status action config
@@ -175,6 +179,40 @@ function ViewMode({
       onMutationSuccess();
     },
   });
+
+  // Deposit / payment queries
+  const { data: deposits = [] } = trpc.payment.getByReservation.useQuery(
+    { reservationId: reservation.id },
+  );
+  const { data: paymentStatus } = trpc.payment.getStripeStatus.useQuery();
+
+  const [showDepositDialog, setShowDepositDialog] = React.useState(false);
+  const [showSetupCardDialog, setShowSetupCardDialog] = React.useState(false);
+  const [showNoShowConfirm, setShowNoShowConfirm] = React.useState(false);
+
+  const chargeNoShow = trpc.payment.chargeNoShow.useMutation({
+    onSuccess: () => {
+      setShowNoShowConfirm(false);
+      utils.payment.getByReservation.invalidate({ reservationId: reservation.id });
+    },
+  });
+
+  const refundDeposit = trpc.payment.refund.useMutation({
+    onSuccess: () => {
+      utils.payment.getByReservation.invalidate({ reservationId: reservation.id });
+    },
+  });
+
+  const capturedDeposit = deposits.find(
+    (d) => d.status === "CAPTURED" && d.type === "deposit",
+  );
+  const hasCardOnFile = deposits.some((d) => d.stripePaymentMethodId !== null);
+  const hasDeposit = deposits.some(
+    (d) => d.type === "deposit" && d.status !== "REFUNDED",
+  );
+  const isStripeConnected = paymentStatus?.liveStatus?.status === "active";
+  const depositAmountCents = paymentStatus?.depositAmountCents ?? 0;
+  const noShowFeeCents = paymentStatus?.noShowFeeCents ?? 0;
 
   const customerName = reservation.customer
     ? `${reservation.customer.firstName} ${reservation.customer.lastName ?? ""}`.trim()
@@ -315,6 +353,100 @@ function ViewMode({
               </>
             )}
 
+          {/* Deposit / Payment Info */}
+          {isStripeConnected && (
+            <>
+              <div>
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                  <CreditCard className="h-3.5 w-3.5" /> Payment
+                </h4>
+                {deposits.length > 0 ? (
+                  <div className="space-y-2">
+                    {deposits.map((deposit) => (
+                      <div
+                        key={deposit.id}
+                        className="flex items-center justify-between rounded-md border p-2.5 text-sm"
+                      >
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span>
+                            {deposit.type === "no_show_fee"
+                              ? "No-show fee"
+                              : "Deposit"}
+                          </span>
+                          <span className="font-medium">
+                            ${(deposit.amount / 100).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={
+                              deposit.status === "CAPTURED"
+                                ? "default"
+                                : deposit.status === "REFUNDED"
+                                  ? "outline"
+                                  : "secondary"
+                            }
+                            className="text-xs"
+                          >
+                            {deposit.status}
+                          </Badge>
+                          {deposit.status === "CAPTURED" &&
+                            deposit.type === "deposit" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 text-xs"
+                                disabled={refundDeposit.isPending}
+                                onClick={() =>
+                                  refundDeposit.mutate({ depositId: deposit.id })
+                                }
+                              >
+                                Refund
+                              </Button>
+                            )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No deposit collected
+                  </p>
+                )}
+
+                {/* Action buttons for deposits */}
+                {!isTerminal && (
+                  <div className="flex gap-2 mt-2">
+                    {!hasDeposit && depositAmountCents > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => setShowDepositDialog(true)}
+                      >
+                        <DollarSign className="h-3 w-3 mr-1" />
+                        Collect Deposit
+                      </Button>
+                    )}
+                    {!hasCardOnFile && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => setShowSetupCardDialog(true)}
+                      >
+                        <CreditCard className="h-3 w-3 mr-1" />
+                        Save Card
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+              <Separator />
+            </>
+          )}
+
           {/* Tags */}
           {reservation.tags.length > 0 && (
             <>
@@ -383,24 +515,108 @@ function ViewMode({
               variant={action.variant}
               size="sm"
               disabled={updateStatus.isPending}
-              onClick={() =>
-                updateStatus.mutate({
-                  id: reservation.id,
-                  status: action.next as
-                    | "PENDING"
-                    | "CONFIRMED"
-                    | "SEATED"
-                    | "COMPLETED"
-                    | "CANCELLED"
-                    | "NO_SHOW",
-                })
-              }
+              onClick={() => {
+                if (action.next === "NO_SHOW" && hasCardOnFile && noShowFeeCents > 0) {
+                  // Show no-show confirm dialog instead of immediate status change
+                  updateStatus.mutate({
+                    id: reservation.id,
+                    status: "NO_SHOW",
+                  });
+                  setShowNoShowConfirm(true);
+                } else {
+                  updateStatus.mutate({
+                    id: reservation.id,
+                    status: action.next as
+                      | "PENDING"
+                      | "CONFIRMED"
+                      | "SEATED"
+                      | "COMPLETED"
+                      | "CANCELLED"
+                      | "NO_SHOW",
+                  });
+                }
+              }}
             >
               {action.label}
             </Button>
           ))}
         </div>
       )}
+
+      {/* No-show charge confirmation */}
+      {reservation.status === "NO_SHOW" && hasCardOnFile && noShowFeeCents > 0 && !showNoShowConfirm && (
+        <div className="flex gap-2 p-4 border-t bg-background">
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setShowNoShowConfirm(true)}
+          >
+            <DollarSign className="h-3.5 w-3.5 mr-1" />
+            Charge No-Show Fee
+          </Button>
+        </div>
+      )}
+
+      {showNoShowConfirm && (
+        <div className="p-4 border-t bg-amber-50 space-y-3">
+          <p className="text-sm font-medium">
+            Charge ${(noShowFeeCents / 100).toFixed(2)} no-show fee to the card on file?
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={chargeNoShow.isPending}
+              onClick={() =>
+                chargeNoShow.mutate({
+                  reservationId: reservation.id,
+                  amount: noShowFeeCents,
+                })
+              }
+            >
+              {chargeNoShow.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+              ) : (
+                <DollarSign className="h-3.5 w-3.5 mr-1" />
+              )}
+              Charge
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowNoShowConfirm(false)}
+            >
+              Skip
+            </Button>
+          </div>
+          {chargeNoShow.isError && (
+            <p className="text-xs text-destructive">
+              {chargeNoShow.error.message}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Deposit collection dialog */}
+      <DepositDialog
+        open={showDepositDialog}
+        onClose={() => setShowDepositDialog(false)}
+        reservationId={reservation.id}
+        amount={depositAmountCents}
+        onSuccess={() => {
+          utils.payment.getByReservation.invalidate({ reservationId: reservation.id });
+        }}
+      />
+
+      {/* Save card dialog */}
+      <SetupCardDialog
+        open={showSetupCardDialog}
+        onClose={() => setShowSetupCardDialog(false)}
+        reservationId={reservation.id}
+        onSuccess={() => {
+          utils.payment.getByReservation.invalidate({ reservationId: reservation.id });
+        }}
+      />
     </>
   );
 }
@@ -446,6 +662,9 @@ function FormMode({
     phone: string;
   } | null>(null);
   const [formError, setFormError] = React.useState<string | null>(null);
+  const [depositReservationId, setDepositReservationId] = React.useState<string | null>(null);
+
+  const { data: paymentStatus } = trpc.payment.getStripeStatus.useQuery();
 
   // Watch values needed for table availability query
   const watchDate = watch("date");
@@ -492,10 +711,16 @@ function FormMode({
     }
   }, [isEdit]); // Only run when switching to edit mode
 
+  const requireDepositValue = watch("requireDeposit");
+
   const createMutation = trpc.reservation.create.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       onMutationSuccess();
-      onClose();
+      if (requireDepositValue && paymentStatus?.depositAmountCents) {
+        setDepositReservationId(data.id);
+      } else {
+        onClose();
+      }
     },
     onError: (err) => setFormError(err.message),
   });
@@ -845,6 +1070,32 @@ function FormMode({
 
           <Separator />
 
+          {/* Deposit toggle (create mode only) */}
+          {!isEdit && (
+            <Controller
+              name="requireDeposit"
+              control={control}
+              render={({ field }) => (
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <Checkbox
+                    checked={field.value ?? false}
+                    onCheckedChange={(c) => field.onChange(!!c)}
+                  />
+                  <div>
+                    <span className="text-sm font-medium">
+                      Require deposit
+                    </span>
+                    <p className="text-xs text-muted-foreground">
+                      Collect a deposit after creating this reservation
+                    </p>
+                  </div>
+                </label>
+              )}
+            />
+          )}
+
+          <Separator />
+
           {/* Notes */}
           <div className="space-y-3">
             <div>
@@ -901,6 +1152,23 @@ function FormMode({
           Cancel
         </Button>
       </div>
+
+      {/* Deposit collection after creation */}
+      {depositReservationId && paymentStatus?.depositAmountCents && (
+        <DepositDialog
+          open={!!depositReservationId}
+          onClose={() => {
+            setDepositReservationId(null);
+            onClose();
+          }}
+          reservationId={depositReservationId}
+          amount={paymentStatus.depositAmountCents}
+          onSuccess={() => {
+            setDepositReservationId(null);
+            onClose();
+          }}
+        />
+      )}
     </>
   );
 }

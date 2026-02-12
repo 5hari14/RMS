@@ -24,6 +24,9 @@ export const reservationFormSchema = z.object({
   customerName: z.string().optional(),
   customerEmail: z.string().optional(),
   customerPhone: z.string().optional(),
+
+  // Deposit
+  requireDeposit: z.boolean().optional(),
 });
 
 export type ReservationFormValues = z.infer<typeof reservationFormSchema>;
@@ -58,6 +61,7 @@ export function getDefaultValues(mode: "create" | "edit", reservation?: {
       customerName: undefined,
       customerEmail: undefined,
       customerPhone: undefined,
+      requireDeposit: false,
     };
   }
 
@@ -75,5 +79,6 @@ export function getDefaultValues(mode: "create" | "edit", reservation?: {
     customerName: undefined,
     customerEmail: undefined,
     customerPhone: undefined,
+    requireDeposit: false,
   };
 }

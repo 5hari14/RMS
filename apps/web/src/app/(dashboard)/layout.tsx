@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAuth } from "@/lib/require-auth";
 import {
   CalendarDays,
+  CreditCard,
   LayoutDashboard,
   Map,
   MapPin,
@@ -17,6 +18,7 @@ const navItems = [
   { href: "/floor-plan/live", label: "Live View", icon: MapPin },
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/tables", label: "Tables", icon: UtensilsCrossed },
+  { href: "/settings/payments", label: "Payments", icon: CreditCard },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

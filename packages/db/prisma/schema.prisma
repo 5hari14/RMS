@@ -103,6 +103,14 @@ model Restaurant {
   enableSmsConfirmations   Boolean @default(true)
   enableReminders          Boolean @default(true)
 
+  // Stripe / Payment settings
+  stripeAccountId       String?
+  stripeAccountStatus   String?  // "active", "pending", "restricted"
+  depositAmountCents    Int      @default(0)
+  noShowFeeCents        Int      @default(0)
+  depositPolicy         String   @default("never") // "never", "all", "partySize", "custom"
+  depositMinPartySize   Int      @default(6)
+
   users           User[]
   customers       Customer[]
   floorPlans      FloorPlan[]
@@ -320,8 +328,11 @@ model Deposit {
   amount   Int           // in smallest currency unit (cents)
   currency String        @default("USD")
   status   DepositStatus @default(PENDING)
+  type     String        @default("deposit") // "deposit" or "no_show_fee"
 
   stripePaymentIntentId String? @unique
+  stripeSetupIntentId   String?
+  stripePaymentMethodId String?
 
   reservationId String
   reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
